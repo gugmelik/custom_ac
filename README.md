@@ -130,5 +130,3 @@ This trades compute for memory.
 ## Notes and Limitations
 
 - The current custom wrapper is shaped for `module(x)` style calls and single-tensor output.
-- Built-in checkpointing (`torch.utils.checkpoint`) is generally safer for broad model patterns and distributed settings.
-- On CPU, CUDA memory stats are reported as `N/A`.
