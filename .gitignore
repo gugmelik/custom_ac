@@ -208,3 +208,6 @@ __marimo__/
 
 # Generated profiling artifacts
 cuda_memory_snapshots/
+# Local large docs and notebooks
+*.pdf
+notebooks/
