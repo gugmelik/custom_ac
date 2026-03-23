@@ -236,7 +236,7 @@ def main() -> None:
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
     parser.add_argument("--seq_start", type=int, default=7000)
     parser.add_argument("--seq_end", type=int, default=10000)
-    parser.add_argument("--seq_step", type=int, default=200)
+    parser.add_argument("--seq_step", type=int, default=500)
     parser.add_argument("--batch_size", type=int, default=1)
     parser.add_argument("--vocab_size", type=int, default=50257)
     parser.add_argument("--d_model", type=int, default=128)

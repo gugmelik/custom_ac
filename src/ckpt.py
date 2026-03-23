@@ -1,5 +1,9 @@
-import torch 
+import logging
+
+import torch
 import torch.nn as nn
+
+logger = logging.getLogger(__name__)
 
 """
 This code implements manual activation checkpointing for a single module call. 
@@ -22,6 +26,13 @@ class _CheckpointBlockFn(torch.autograd.Function):
         ctx.preserve_rng_state = preserve_rng_state
         ctx.save_for_backward(x)
 
+        logger.debug(
+            "checkpoint forward: module=%s device=%s preserve_rng_state=%s",
+            module.__class__.__name__,
+            x.device,
+            preserve_rng_state,
+        )
+
         if preserve_rng_state:
             ctx.cpu_rng_state = torch.get_rng_state()
             if x.is_cuda:
@@ -38,6 +49,13 @@ class _CheckpointBlockFn(torch.autograd.Function):
         (x,) = ctx.saved_tensors
         x = x.detach().requires_grad_(True)
 
+        logger.debug(
+            "checkpoint backward: module=%s device=%s preserve_rng_state=%s",
+            ctx.module.__class__.__name__,
+            x.device,
+            ctx.preserve_rng_state,
+        )
+
         if ctx.preserve_rng_state:
             cpu_rng_state = torch.get_rng_state()
             cuda_rng_state = torch.cuda.get_rng_state(x.device) if x.is_cuda else None
@@ -50,6 +68,7 @@ class _CheckpointBlockFn(torch.autograd.Function):
             out = ctx.module(x)
 
         param_list = tuple(p for p in ctx.module.parameters() if p.requires_grad)
+        logger.debug("checkpoint backward: trainable_params=%d", len(param_list))
         grads = torch.autograd.grad(
             outputs=out,
             inputs=(x, *param_list),
@@ -68,5 +87,10 @@ class _CheckpointBlockFn(torch.autograd.Function):
 
 
 def checkpoint_block(module: nn.Module, x: torch.Tensor, preserve_rng_state: bool = True) -> torch.Tensor:
+    logger.debug(
+        "checkpoint call: module=%s preserve_rng_state=%s",
+        module.__class__.__name__,
+        preserve_rng_state,
+    )
     params = tuple(p for p in module.parameters() if p.requires_grad)
     return _CheckpointBlockFn.apply(x, module, preserve_rng_state, *params)
