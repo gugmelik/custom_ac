@@ -9,6 +9,7 @@ class ProfileResult:
     name: str
     avg_step_time_s: float
     peak_memory_mb: float | None
+    self_cuda_time_per_step_ms: float | None = None
 
 
 @torch.no_grad()
