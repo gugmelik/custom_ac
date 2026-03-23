@@ -1,0 +1,9 @@
+{
+  "started_at": "2026-03-23T13:10:54",
+  "selected_scenarios": [
+    "custom_checkpoint",
+    "nn_transformer"
+  ],
+  "cuda_snapshot_dir": null,
+  "profiler_trace_dir": null
+}

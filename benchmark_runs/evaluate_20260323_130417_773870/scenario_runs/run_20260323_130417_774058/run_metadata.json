@@ -1,0 +1,11 @@
+{
+  "started_at": "2026-03-23T13:04:17",
+  "selected_scenarios": [
+    "baseline",
+    "custom_checkpoint",
+    "torch_checkpoint",
+    "nn_transformer"
+  ],
+  "cuda_snapshot_dir": null,
+  "profiler_trace_dir": null
+}
