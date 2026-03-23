@@ -164,13 +164,13 @@ benchmark_runs/
 
 ## Analysis
 
-- This indicates that checkpointing consumes less peak memory than the non-checkpointed baseline for the tested sequence lengths.
+Graph indicates that checkpointing consumes less peak memory than the non-checkpointed baseline for the tested sequence lengths.
 
 ![Pairwise memory plot: baseline vs custom_checkpoint](benchmark_runs/evaluate_20260323_130417_773870/plots/pairwise/pair_memory_baseline_vs_custom_checkpoint.png)
 
 _Figure: Peak memory comparison across sequence lengths for `baseline` (x-axis) vs `custom_checkpoint` (y-axis)._ 
 
-- In the `custom_checkpoint` vs `torch_checkpoint` memory comparison, memory consumption is similar across all tested sequence lengths — the manual checkpointing implementation matches `torch.utils.checkpoint` in peak memory usage.
+In the `custom_checkpoint` vs `torch_checkpoint` memory comparison, memory consumption is similar across all tested sequence lengths — the manual checkpointing implementation matches `torch.utils.checkpoint` in peak memory usage.
 
 This is further confirmed by a second independent run at a longer sequence-length range:
 
@@ -178,8 +178,8 @@ This is further confirmed by a second independent run at a longer sequence-lengt
 
 _Figure: Second run — peak memory comparison for `custom_checkpoint` (x-axis) vs `torch_checkpoint` (y-axis). Points cluster tightly on the y=x line, confirming equivalent memory consumption._
 
-- This indicates that the scratch-implemented Transformer with manual checkpointing consumes more peak memory than the `nn.TransformerEncoder`-based model in that token range.
-- For this workload and configuration, activation checkpointing in the custom-from-scratch stack does not outperform the built-in `nn.Transformer` path on peak memory at longer contexts.
+From diagram we can colclude that the scratch-implemented Transformer with manual checkpointing consumes more peak memory than the `nn.TransformerEncoder`-based model in that token range.
+For this workload and configuration, activation checkpointing in the custom-from-scratch stack does not outperform the built-in `nn.Transformer` path on peak memory at longer contexts.
 
 ![Pairwise memory plot: custom_checkpoint vs nn_transformer](benchmark_runs/evaluate_20260323_131017_046544/plots/pairwise/pair_memory_custom_checkpoint_vs_nn_transformer.png)
 
@@ -189,7 +189,7 @@ _Figure: Peak memory comparison across sequence lengths for `custom_checkpoint` 
 
 ![CUDA memory timeline: custom_checkpoint](benchmark_runs/run_20260323_132510_538899/cuda_memory_snapshots/memory_viz-1.png)
 
- The most important thing to observe is the **sawtooth pattern**: memory rises sharply during the forward pass, drops when activations are freed at the end of each checkpointed block, then spikes again during the backward recomputation before falling back as gradients are consumed. This pattern confirms that manual checkpointing is working correctly — intermediate activations are not retained between the forward and backward pass, keeping the steady-state memory footprint low.
+The most important thing to observe is the **sawtooth pattern**: memory rises sharply during the forward pass, drops when activations are freed at the end of each checkpointed block, then spikes again during the backward recomputation before falling back as gradients are consumed. This pattern confirms that manual checkpointing is working correctly — intermediate activations are not retained between the forward and backward pass, keeping the steady-state memory footprint low.
 
 ## torch.profiler Results — `custom_checkpoint`
 
@@ -212,17 +212,16 @@ Self CPU time total: 6.446s
 Self CUDA time total: 6.637s
 ```
 
-- **Sorted by `self_cuda_time_total`** on CUDA devices (falls back to `self_device_time_total` if that attribute is absent, then `self_cpu_time_total` on CPU). This surfaces the kernels that spend the most time actually executing on the GPU, ignoring time spent waiting on sub-calls.
-- **Top 10 rows only** — `row_limit=10`, so only the heaviest kernels by self CUDA time are shown.
+**Sorted by `self_cuda_time_total`** on CUDA devices (falls back to `self_device_time_total` if that attribute is absent, then `self_cpu_time_total` on CPU). This surfaces the kernels that spend the most time actually executing on the GPU, ignoring time spent waiting on sub-calls.
+**Top 10 rows only** — `row_limit=10`, so only the heaviest kernels by self CUDA time are shown.
 
 Key takeaways from the profiling run:
 
-- **Matrix multiplications dominate GPU time.** The top three CUDA kernels are all `ampere_sgemm` variants (`nn`, `nt`, `tn` — corresponding to forward QKV projection, key/value attention products, and output projection), collectively accounting for ~28% of total CUDA time. This is expected for a Transformer — attention and feed-forward linear layers are the computational core.
-- **DtoD memory copies consume 9% of CUDA time** (602 ms over 60 calls). These are caused by activation checkpointing reloading saved inputs back to the recomputation kernel during the backward pass — a direct and measurable cost of trading compute for memory.
-- **SoftMax runs at 20 calls for backward vs 40 for forward**, because only one backward recompute pass is needed per block, confirming the checkpointing schedule is correct.
-- **Dropout (`fused_dropout_kernel`) is the most-called kernel** (130 calls), appearing in both attention and feed-forward sub-layers across forward and recomputation passes.
-- **CPU is idle during GPU work.** `Self CPU %` is 0% for all top entries — the host is not the bottleneck; all execution time is on the GPU.
-- **Total CUDA time (6.637 s) slightly exceeds CPU time (6.446 s)**, confirming GPU-bound execution with good CPU–GPU overlap.
+**Matrix multiplications dominate GPU time.** The top three CUDA kernels are all `ampere_sgemm` variants (`nn`, `nt`, `tn` — corresponding to forward QKV projection, key/value attention products, and output projection), collectively accounting for ~28% of total CUDA time. This is expected for a Transformer — attention and feed-forward linear layers are the computational core.
+**DtoD memory copies consume 9% of CUDA time** (602 ms over 60 calls). These are caused by activation checkpointing reloading saved inputs back to the recomputation kernel during the backward pass — a direct and measurable cost of trading compute for memory.
+**SoftMax runs at 20 calls for backward vs 40 for forward**, because only one backward recompute pass is needed per block, confirming the checkpointing schedule is correct.
+**Dropout (`fused_dropout_kernel`) is the most-called kernel** (130 calls), appearing in both attention and feed-forward sub-layers across forward and recomputation passes.
+**Total CUDA time (6.637 s) slightly exceeds CPU time (6.446 s)**, confirming GPU-bound execution with good CPU–GPU overlap.
 
 
 ## Further Improvements: Selective Activation Checkpointing
@@ -230,9 +229,6 @@ Key takeaways from the profiling run:
 Two-word description: **Targeted recomputation**.
 
 Potential next improvements:
-- Checkpoint only high-memory layers (for example, last N Transformer blocks where activations are largest).
-- Use sequence-length-aware policies (enable stronger checkpointing only above a token threshold).
-- Checkpoint only attention or only MLP sublayers instead of full blocks.
-- Auto-tune checkpoint policy per GPU budget (optimize for a memory cap with minimum latency).
-- Combine with mixed precision and FlashAttention-style kernels for better speed-memory trade-offs.
-- Add runtime telemetry-driven switching (adapt checkpoint granularity when nearing OOM).
+ Use selective activation checkpointing
+ Auto-tune checkpoint policy per GPU budget (optimize for a memory cap with minimum latency).
+ Combine with mixed precision and FlashAttention-style kernels for better speed-memory trade-offs.
