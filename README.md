@@ -217,18 +217,21 @@ Self CUDA time total: 6.637s
 
 Key takeaways from the profiling run:
 
-**Matrix multiplications dominate GPU time.** The top three CUDA kernels are all `ampere_sgemm` variants (`nn`, `nt`, `tn` — corresponding to forward QKV projection, key/value attention products, and output projection), collectively accounting for ~28% of total CUDA time. This is expected for a Transformer — attention and feed-forward linear layers are the computational core.
+**Matrix multiplications dominate GPU time.** The top three CUDA kernels are all `ampere_sgemm` variants (`nn`, `nt`, `tn` — corresponding to forward QKV projection, key/value attention products, and output projection), collectively accounting for ~28% of total CUDA time. This is expected for a Transformer — attention and feed-forward linear layers are the computational core.\
+
 **DtoD memory copies consume 9% of CUDA time** (602 ms over 60 calls). These are caused by activation checkpointing reloading saved inputs back to the recomputation kernel during the backward pass — a direct and measurable cost of trading compute for memory.
+
 **SoftMax runs at 20 calls for backward vs 40 for forward**, because only one backward recompute pass is needed per block, confirming the checkpointing schedule is correct.
+
 **Dropout (`fused_dropout_kernel`) is the most-called kernel** (130 calls), appearing in both attention and feed-forward sub-layers across forward and recomputation passes.
+
 **Total CUDA time (6.637 s) slightly exceeds CPU time (6.446 s)**, confirming GPU-bound execution with good CPU–GPU overlap.
 
 
 ## Further Improvements: Selective Activation Checkpointing
 
-Two-word description: **Targeted recomputation**.
-
 Potential next improvements:
- Use selective activation checkpointing
- Auto-tune checkpoint policy per GPU budget (optimize for a memory cap with minimum latency).
- Combine with mixed precision and FlashAttention-style kernels for better speed-memory trade-offs.
+
+-Auto-tune checkpoint policy per GPU budget (optimize for a memory cap with minimum latency).
+
+-Combine with mixed precision and FlashAttention-style kernels for better speed-memory trade-offs.
